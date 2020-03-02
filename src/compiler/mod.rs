@@ -51,10 +51,24 @@ impl<'a> SymbolInfo<'a> {
 }
 
 #[derive(Debug)]
+pub(crate) enum NarrativeItem {
+    Dialogue{character: String, dialogue: String},
+    ChoiceSet{character: String, choices: Vec<NarrativeChoice>}
+}
+
+#[derive(Debug)]
+pub(crate) struct NarrativeChoice {
+    text: String,
+    jump: String,
+}
+
+
+#[derive(Debug)]
 pub(crate) struct Compiler<'a> {
     symbols: BTreeMap<String, SymbolInfo<'a>>,
     errors: Vec<ParseError<'a>>,
-    unknown_symbols: HashSet<String>
+    unknown_symbols: HashSet<String>,
+    definition: BTreeMap<String, Vec<NarrativeItem>>,
 }
 
 impl<'a> Compiler<'a> {
@@ -63,6 +77,7 @@ impl<'a> Compiler<'a> {
             symbols: BTreeMap::new(),
             errors: vec![],
             unknown_symbols: HashSet::new(),
+            definition: BTreeMap::new(),
         }
     }
 
@@ -73,18 +88,34 @@ impl<'a> Compiler<'a> {
         }
     }
 
+    fn is_defined(&self, symbol: &str) -> bool {
+        match self.definition.get(symbol) {
+            Some(_) => true,
+            None => false
+        }
+    }
+
     fn record_symbol(&mut self, symbol: String, info: SymbolInfo<'a>) {
         self.unknown_symbols.remove(&symbol);
         self.symbols.insert(symbol, info);
     }
 
-    fn record_conflict(&mut self, symbol: String, path: &'a Path) {
+    fn record_dec_conflict(&mut self, symbol: String, path: &'a Path) {
         let previous = self.symbols.get(&symbol).unwrap();
         self.errors.push(ParseError::Redeclared {
             symbol,
             original: previous.source,
             conflict: path,
-        })
+        });
+    }
+
+    fn record_def_conflict(&mut self, symbol: String, path: &'a Path) {
+        let previous = self.symbols.get(&symbol).unwrap();
+        self.errors.push(ParseError::Redefined {
+            symbol,
+            original: previous.source,
+            conflict: path,
+        });
     }
 
     fn parse_symbol_type(&mut self, atom: &'a str) -> Option<SymbolType> {
@@ -129,7 +160,7 @@ impl<'a> Compiler<'a> {
 
         let info = SymbolInfo::new(path, sym_type, attrs);
         match self.has_symbol(&symbol) {
-            true => self.record_conflict(symbol, path),
+            true => self.record_dec_conflict(symbol, path),
             false => self.record_symbol(symbol, info),
         };
     }
@@ -153,34 +184,98 @@ impl<'a> Compiler<'a> {
             self.unknown_symbols.insert(ident.to_string());
         }
 
-        let defn = inner.next().unwrap();
-        match defn.as_rule() {
+        if self.is_defined(ident) {
+            self.record_def_conflict(ident.to_string(), path);
+            return;
+        }
+
+        let definition = inner.next().unwrap();
+        match definition.as_rule() {
             Rule::dialogue_def => {
-                self.dialogue_def(defn.into_inner());
+                let seq = self.dialogue_def(definition.into_inner());
+                self.definition.insert(ident.to_string(), seq);
             },
             _ => ()
         };
     }
 
-    fn dialogue_def(&mut self, pairs: Pairs<Rule>) {
-        for pair in pairs {
+    fn dialogue_def(&mut self, pairs: Pairs<Rule>) -> Vec<NarrativeItem> {
+         pairs.map(|pair| {
             match pair.as_rule() {
-                Rule::dialogue_expr => {
-                    self.dialogue_expr(pair.into_inner());
-                }
-                Rule::choice_expr => {
-                    self.choice_expr(pair.into_inner());
-                }
+                Rule::dialogue_expr => self.dialogue_expr(pair.into_inner()),
+                Rule::choice_expr => self.choice_expr(pair.into_inner()),
                 _ => unreachable!()
+            }
+        }).collect()
+    }
+
+    fn dialogue_expr(&mut self, mut pairs: Pairs<Rule>) -> NarrativeItem {
+        let character = pairs.next().unwrap().as_str()[1..].to_string();
+        if !self.has_symbol(&character) {
+            self.unknown_symbols.insert(character.clone());
+        }
+        let dialogue = pairs.next().unwrap().as_str().to_string();
+        NarrativeItem::Dialogue { character, dialogue }
+    }
+
+    fn choice_expr(&mut self, mut pairs: Pairs<Rule>) -> NarrativeItem {
+        let character = pairs.next().unwrap().as_str()[1..].to_string();
+        if !self.has_symbol(&character) {
+            self.unknown_symbols.insert(character.clone());
+        }
+
+        let choices: Vec<NarrativeChoice> = pairs.map(|pair| {
+            let mut tokens = pair.into_inner();
+            let text = tokens.next().unwrap().as_str().to_string();
+            let jump = tokens.next().unwrap().as_str();
+
+            if !self.has_symbol(jump) {
+                self.unknown_symbols.insert(jump.to_string());
+            }
+
+            NarrativeChoice {
+                text,
+                jump: jump.to_string(),
+            }
+        }).collect();
+
+        NarrativeItem::ChoiceSet { character, choices }
+    }
+
+    pub(crate) fn are_symbols_defined(&self) -> bool {
+        match self.unknown_symbols.is_empty() {
+            true => true,
+            false => {
+                for symbol  in self.unknown_symbols.iter() {
+                    error!("{}", ParseError::UndeclaredSymbol(symbol));
+                }
+                false
             }
         }
     }
 
-    fn dialogue_expr(&mut self, pairs: Pairs<Rule>) {
-        println!("{:#?}", pairs);
+    pub(crate) fn is_error_free(&self) -> bool {
+        match self.errors.is_empty() {
+            true => true,
+            false => {
+                for error  in self.errors.iter() {
+                    error!("{}", error);
+                }
+                false
+            }
+        }
     }
 
-    fn choice_expr(&mut self, pairs: Pairs<Rule>) {
-
+    pub(crate) fn all_acts_defined(&self) -> bool {
+        let mut flag = true;
+        self.symbols.iter().for_each(|(s, info)| {
+            if let SymbolType::Act = info.symbol_type {
+                if !self.definition.contains_key(s) {
+                    error!("{}", ParseError::UndefinedSymbol(s));
+                    flag = false;
+                }
+            }
+        });
+        flag
     }
 }

@@ -10,7 +10,10 @@ pub enum ParseError<'a> {
     NoProgram(&'a Path),
     RuleMismatch{expected: Rule, found: Rule},
     UnknownAtom(&'a str),
-    Redeclared {symbol: String, original: &'a Path, conflict: &'a Path}
+    Redeclared {symbol: String, original: &'a Path, conflict: &'a Path},
+    Redefined {symbol: String, original: &'a Path, conflict: &'a Path},
+    UndeclaredSymbol(&'a str),
+    UndefinedSymbol(&'a str),
 }
 
 impl<'a> Display for ParseError<'a> {
@@ -30,6 +33,16 @@ impl<'a> Display for ParseError<'a> {
                     "'{}' has more than one declaration at {:?} and {:?}",
                     symbol, original, conflict
                 ),
+            ParseError::Redefined { symbol, original, conflict } =>
+                write!(
+                    f,
+                    "'{}' has more than one defined at {:?} and {:?}",
+                    symbol, original, conflict
+                ),
+            ParseError::UndeclaredSymbol(s) =>
+                write!(f, "Symbol {} is not declared", s),
+            ParseError::UndefinedSymbol(s) =>
+                write!(f, "Symbol {} is declared but not defined", s),
         }
     }
 }

@@ -1,6 +1,8 @@
 :character Radius{name: "Radius"}
 :character DrBread{name: "Dr. Bread", age: "32"}
 :act Act1
+:act DoingGood
+:act NotSoWell
 
 %define Act1 {
     @Radius "Hello, how are you?"
@@ -9,4 +11,12 @@
         "No, I'm cool" DoingGood,
         "Not so well." NotSoWell,
     ]
+}
+
+%define DoingGood {
+    @DrBread "Oh well, then I'd rather walk away."
+}
+
+%define NotSoWell {
+    @DrBread "Keep up the good work!"
 }

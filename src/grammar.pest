@@ -11,7 +11,7 @@ def_expr         = { "%define" ~ identifier ~ dialogue_def }
 dialogue_def     = { open_brace ~ (dialogue_expr | choice_expr)+ ~ close_brace }
 dialogue_expr    = { character_ref ~ string }
 choice_expr      = { character_ref ~ open_square ~ (choice_record ~ close_square | choice_seq ~ close_square) }
-choice_seq      = { (choice_record ~ ",")+ ~ choice_record?  }
+choice_seq       = _{ (choice_record ~ ",")+ ~ choice_record?  }
 choice_record    = { string ~ identifier }
 
 
