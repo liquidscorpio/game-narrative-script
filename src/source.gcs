@@ -1,0 +1,12 @@
+:character Radius{name: "Radius"}
+:character DrBread{name: "Dr. Bread", age: "32"}
+:act Act1
+
+%define Act1 {
+    @Radius "Hello, how are you?"
+    @DrBread "Thanks, I'm good! And you?"
+    @Radius [
+        "No, I'm cool" DoingGood,
+        "Not so well." NotSoWell,
+    ]
+}

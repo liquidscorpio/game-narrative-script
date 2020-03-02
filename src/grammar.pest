@@ -1,0 +1,34 @@
+program          = { SOI ~ statement+ ~ EOI }
+statement        = _{ dec_expr | def_expr }
+
+dec_expr         = { atom ~ identifier ~ object_attrs? }
+atom             = @{ ":" ~ identifier }
+object_attrs     = { open_brace ~ kv_pairs* ~ close_brace }
+kv_pairs         = { kv_pair ~ ("," ~ kv_pair)* }
+kv_pair          = { identifier ~ ":" ~ string }
+
+def_expr         = { "%define" ~ identifier ~ dialogue_def }
+dialogue_def     = { open_brace ~ (dialogue_expr | choice_expr)+ ~ close_brace }
+dialogue_expr    = { character_ref ~ string }
+choice_expr      = { character_ref ~ open_square ~ (choice_record ~ close_square | choice_seq ~ close_square) }
+choice_seq      = { (choice_record ~ ",")+ ~ choice_record?  }
+choice_record    = { string ~ identifier }
+
+
+multi_line_string  = @{ "\"\"\"" ~ inner ~ "\"\"\"" }
+string             = @{ "\"" ~ inner ~ "\"" }
+inner              = @{ (!("\"" | "\\" | "\u{0000}" | "\u{001F}") ~ ANY)* ~ (escape ~ inner)? }
+identifier         = @{ (ASCII_ALPHANUMERIC | "_" | "-")+ }
+character_ref     = @{"@" ~ identifier }
+
+escape  = @{ "\\" ~ ("b" | "t" | "n" | "f" | "r" | "\"" | "\\" | unicode | NEWLINE)? }
+unicode = @{ "u" ~ ASCII_HEX_DIGIT{4} | "U" ~ ASCII_HEX_DIGIT{8} }
+
+open_brace        = _{ "{" }
+close_brace       = _{ "}" }
+open_square       = _{ "[" }
+close_square      = _{ "]" }
+whitespace        = _{ " " | "\t" | "\r" | "\n" }
+nbsp              = _{ " " | "\t" }
+
+WHITESPACE = _{ " " | "\t" | NEWLINE }
