@@ -29,8 +29,8 @@ type SymbolAttributes = HashMap<String, String>;
 struct SymbolInfo<'a> {
     /// Path where the symbol is defined
     source: &'a Path,
-    /// The line number is the source path where the symbol is defined
-    line: i32,
+    /// The start byte is the source path where the symbol is defined
+    start_position: usize,
     /// Type information
     symbol_type: SymbolType,
     /// Optional extra data associated with the symbol
@@ -39,11 +39,12 @@ struct SymbolInfo<'a> {
 
 impl<'a> SymbolInfo<'a> {
     pub(crate) fn new(
-        path: &'a Path, sym_type: SymbolType, attrs: Option<SymbolAttributes>
+        path: &'a Path, sym_type: SymbolType, start_position: usize,
+        attrs: Option<SymbolAttributes>
     ) -> Self {
         SymbolInfo {
             source: path,
-            line: 0,
+            start_position,
             symbol_type: sym_type,
             attributes: attrs
         }
@@ -146,8 +147,8 @@ impl<'a> Compiler<'a> {
         }
     }
     fn dec_expr(&mut self, mut inner: Pairs<'a, Rule>, path: &'a Path) {
-        let atom = inner.next().unwrap().as_str();
-        let sym_type = match self.parse_symbol_type(atom) {
+        let atom = inner.next().unwrap();
+        let sym_type = match self.parse_symbol_type(atom.as_str()) {
             Some(s) => s,
             None => return
         };
@@ -158,7 +159,8 @@ impl<'a> Compiler<'a> {
             None => None
         };
 
-        let info = SymbolInfo::new(path, sym_type, attrs);
+        let info = SymbolInfo::new(
+            path, sym_type, atom.as_span().start(), attrs);
         match self.has_symbol(&symbol) {
             true => self.record_dec_conflict(symbol, path),
             false => self.record_symbol(symbol, info),
