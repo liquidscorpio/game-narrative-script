@@ -70,6 +70,6 @@ pub fn main() -> Result<(), Box<dyn Error>> {
         "/home/tintin/Studio/game-narrative-script/source.gcstree"
     );
     let mut walker = NarrativeWalker::new(walker_path)?;
-    walker.traverse("NotSoWell")?;
+    println!("{:?}", walker.traverse("NotSoWell")?);
     Ok(())
 }

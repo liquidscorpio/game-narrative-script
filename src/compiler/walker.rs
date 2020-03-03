@@ -37,8 +37,10 @@ impl<'a> NarrativeWalker<'a> {
                 let mut buf = vec![0u8; size];
                 self.source_handle.seek(SeekFrom::Start(*start as u64))?;
                 self.source_handle.read_exact(&mut buf)?;
-                let seq = str::from_utf8(&buf)?;
-                let items: Vec<NarrativeItem> = serde_json::from_str(seq)?;
+                let mut decoder = snap::raw::Decoder::new();
+                let data = decoder.decompress_vec(buf.as_ref())?;
+                let json_str = str::from_utf8(data.as_ref())?;
+                let items: Vec<NarrativeItem> = serde_json::from_str(json_str)?;
                 Ok(items)
             }
             None => {

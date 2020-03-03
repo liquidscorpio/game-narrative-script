@@ -320,16 +320,16 @@ impl<'a> Compiler<'a> {
         };
     }
 
-    fn generate_tree_file(
-        &self
-    ) -> Result<FileIndex, Box<dyn Error>> {
+    fn generate_tree_file(&self) -> Result<FileIndex, Box<dyn Error>> {
         let mut fp = File::create("source.gcstree")?;
         let mut start_byte = 0;
         let mut end_byte = 0;
         let mut index: FileIndex = HashMap::new();
         for (act, narrative) in &self.definition {
             let data= serde_json::to_string(narrative)?;
-            let bytes_written = fp.write(data.as_bytes())?;
+            let mut encoder = snap::raw::Encoder::new();
+            let compressed = encoder.compress_vec(data.as_bytes())?;
+            let bytes_written = fp.write(compressed.as_ref())?;
             end_byte += bytes_written;
             index.insert(act, (start_byte, end_byte));
             start_byte += bytes_written;
