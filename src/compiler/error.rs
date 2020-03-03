@@ -48,3 +48,19 @@ impl<'a> Display for ParseError<'a> {
 }
 
 impl<'a> Error for ParseError<'a> {}
+
+#[derive(Debug)]
+pub enum WalkerError {
+    UnknownScene(String),
+}
+
+impl Display for WalkerError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            WalkerError::UnknownScene(s) =>
+                write!(f, "An unknown scene: {:?}", s),
+        }
+    }
+}
+
+impl Error for WalkerError {}

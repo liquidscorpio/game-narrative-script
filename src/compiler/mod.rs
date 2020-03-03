@@ -10,6 +10,7 @@ use std::error::Error;
 use serde::{Deserialize, Serialize};
 
 pub(crate) mod error;
+pub(crate) mod walker;
 
 #[derive(Debug)]
 enum SymbolType {
@@ -29,6 +30,7 @@ impl SymbolType {
 
 type SymbolAttributes = HashMap<String, String>;
 type FileIndex<'a> = HashMap<&'a str, (usize, usize)>;
+type OwnedFileIndex = HashMap<String, (usize, usize)>;
 
 #[derive(Debug)]
 struct SymbolInfo<'a> {
@@ -330,7 +332,7 @@ impl<'a> Compiler<'a> {
             let bytes_written = fp.write(data.as_bytes())?;
             end_byte += bytes_written;
             index.insert(act, (start_byte, end_byte));
-            start_byte += bytes_written + 1;
+            start_byte += bytes_written;
         }
         fp.flush()?;
         Ok(index)

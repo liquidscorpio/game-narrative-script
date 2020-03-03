@@ -6,6 +6,7 @@ use std::borrow::BorrowMut;
 use crate::compiler::{Compiler};
 use std::error::Error;
 use crate::compiler::error::ParseError;
+use crate::compiler::walker::NarrativeWalker;
 
 #[macro_use]
 extern crate log;
@@ -65,5 +66,10 @@ pub fn main() -> Result<(), Box<dyn Error>> {
         None => ()
     }
 
+    let walker_path = Path::new(
+        "/home/tintin/Studio/game-narrative-script/source.gcstree"
+    );
+    let mut walker = NarrativeWalker::new(walker_path)?;
+    walker.traverse("NotSoWell")?;
     Ok(())
 }
