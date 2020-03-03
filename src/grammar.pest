@@ -16,10 +16,10 @@ choice_record    = { string ~ identifier }
 
 
 multi_line_string  = @{ "\"\"\"" ~ inner ~ "\"\"\"" }
-string             = @{ "\"" ~ inner ~ "\"" }
+string             = @{ double_quote ~ inner ~ double_quote }
 inner              = @{ (!("\"" | "\\" | "\u{0000}" | "\u{001F}") ~ ANY)* ~ (escape ~ inner)? }
 identifier         = @{ (ASCII_ALPHANUMERIC | "_" | "-")+ }
-character_ref     = @{"@" ~ identifier }
+character_ref      = @{"@" ~ identifier }
 
 escape  = @{ "\\" ~ ("b" | "t" | "n" | "f" | "r" | "\"" | "\\" | unicode | NEWLINE)? }
 unicode = @{ "u" ~ ASCII_HEX_DIGIT{4} | "U" ~ ASCII_HEX_DIGIT{8} }
@@ -30,5 +30,6 @@ open_square       = _{ "[" }
 close_square      = _{ "]" }
 whitespace        = _{ " " | "\t" | "\r" | "\n" }
 nbsp              = _{ " " | "\t" }
+double_quote      = _{ "\"" }
 
 WHITESPACE = _{ " " | "\t" | NEWLINE }
