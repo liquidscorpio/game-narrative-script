@@ -2,8 +2,12 @@ use pest::iterators::Pairs;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 
-use crate::{Rule};
+use crate::Rule;
 use crate::compiler::error::ParseError;
+use std::fs::File;
+use std::io::Write;
+use std::error::Error;
+use serde::{Deserialize, Serialize};
 
 pub(crate) mod error;
 
@@ -24,6 +28,7 @@ impl SymbolType {
 }
 
 type SymbolAttributes = HashMap<String, String>;
+type FileIndex<'a> = HashMap<&'a str, (usize, usize)>;
 
 #[derive(Debug)]
 struct SymbolInfo<'a> {
@@ -40,24 +45,24 @@ struct SymbolInfo<'a> {
 impl<'a> SymbolInfo<'a> {
     pub(crate) fn new(
         path: &'a Path, sym_type: SymbolType, start_position: usize,
-        attrs: Option<SymbolAttributes>
+        attrs: Option<SymbolAttributes>,
     ) -> Self {
         SymbolInfo {
             source: path,
             start_position,
             symbol_type: sym_type,
-            attributes: attrs
+            attributes: attrs,
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub(crate) enum NarrativeItem {
-    Dialogue{character: String, dialogue: String},
-    ChoiceSet{character: String, choices: Vec<NarrativeChoice>}
+    Dialogue { character: String, dialogue: String },
+    ChoiceSet { character: String, choices: Vec<NarrativeChoice> },
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub(crate) struct NarrativeChoice {
     text: String,
     jump: String,
@@ -70,6 +75,7 @@ pub(crate) struct Compiler<'a> {
     errors: Vec<ParseError<'a>>,
     unknown_symbols: HashSet<String>,
     definition: BTreeMap<String, Vec<NarrativeItem>>,
+    checks_passed: bool,
 }
 
 impl<'a> Compiler<'a> {
@@ -79,6 +85,7 @@ impl<'a> Compiler<'a> {
             errors: vec![],
             unknown_symbols: HashSet::new(),
             definition: BTreeMap::new(),
+            checks_passed: false,
         }
     }
 
@@ -131,17 +138,17 @@ impl<'a> Compiler<'a> {
 
     /// This one generates symbol table for the file at the given path.
     pub(crate) fn compile(
-        &mut self, pairs: Pairs<'a, Rule>, path: &'a Path
+        &mut self, pairs: Pairs<'a, Rule>, path: &'a Path,
     ) {
         for pair in pairs {
             // We ignore all other rules
             match pair.as_rule() {
                 Rule::dec_expr => {
                     self.dec_expr(pair.into_inner(), path);
-                },
+                }
                 Rule::def_expr => {
                     self.def_expr(pair.into_inner(), path);
-                },
+                }
                 _ => (),
             };
         }
@@ -196,13 +203,13 @@ impl<'a> Compiler<'a> {
             Rule::dialogue_def => {
                 let seq = self.dialogue_def(definition.into_inner());
                 self.definition.insert(ident.to_string(), seq);
-            },
+            }
             _ => ()
         };
     }
 
     fn dialogue_def(&mut self, pairs: Pairs<Rule>) -> Vec<NarrativeItem> {
-         pairs.map(|pair| {
+        pairs.map(|pair| {
             match pair.as_rule() {
                 Rule::dialogue_expr => self.dialogue_expr(pair.into_inner()),
                 Rule::choice_expr => self.choice_expr(pair.into_inner()),
@@ -248,7 +255,7 @@ impl<'a> Compiler<'a> {
         match self.unknown_symbols.is_empty() {
             true => true,
             false => {
-                for symbol  in self.unknown_symbols.iter() {
+                for symbol in self.unknown_symbols.iter() {
                     error!("{}", ParseError::UndeclaredSymbol(symbol));
                 }
                 false
@@ -260,7 +267,7 @@ impl<'a> Compiler<'a> {
         match self.errors.is_empty() {
             true => true,
             false => {
-                for error  in self.errors.iter() {
+                for error in self.errors.iter() {
                     error!("{}", error);
                 }
                 false
@@ -279,5 +286,63 @@ impl<'a> Compiler<'a> {
             }
         });
         flag
+    }
+
+    pub(crate) fn run_checks(&mut self) -> bool {
+        let success: [bool; 3] = [
+            self.are_symbols_defined(),
+            self.is_error_free(),
+            self.all_acts_defined(),
+        ];
+        self.checks_passed = success.iter().all(|v| *v);
+        self.checks_passed
+    }
+
+    pub(crate) fn generate_data_files(&self) {
+        if !self.checks_passed {
+            error!("Please run 'run_checks' before generating files");
+            return;
+        }
+        match self.generate_tree_file() {
+            Ok(index) => {
+                match self.generate_index_file(&index) {
+                    Ok(_) => (),
+                    Err(e) => {
+                        error!("Error generating index file: {:?}", e);
+                    }
+                }
+            },
+            Err(e) => {
+                error!("Error generating data file: {:?}", e);
+            }
+        };
+    }
+
+    fn generate_tree_file(
+        &self
+    ) -> Result<FileIndex, Box<dyn Error>> {
+        let mut fp = File::create("source.gcstree")?;
+        let mut start_byte = 0;
+        let mut end_byte = 0;
+        let mut index: FileIndex = HashMap::new();
+        for (act, narrative) in &self.definition {
+            let data= serde_json::to_string(narrative)?;
+            let bytes_written = fp.write(data.as_bytes())?;
+            end_byte += bytes_written;
+            index.insert(act, (start_byte, end_byte));
+            start_byte += bytes_written + 1;
+        }
+        fp.flush()?;
+        Ok(index)
+    }
+
+    fn generate_index_file(
+        &self, index: &FileIndex
+    ) -> Result<(), Box<dyn Error>> {
+        let mut fp = File::create("source.gcsindex")?;
+        let data = serde_json::to_string(index)?;
+        fp.write(data.as_bytes())?;
+        fp.flush()?;
+        Ok(())
     }
 }

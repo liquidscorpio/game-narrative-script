@@ -14,6 +14,8 @@ extern crate pest;
 #[macro_use]
 extern crate pest_derive;
 
+extern crate serde_json;
+
 mod compiler;
 
 #[derive(Parser)]
@@ -54,14 +56,8 @@ pub fn main() -> Result<(), Box<dyn Error>> {
                     // To avoid name conflict
                     let mut compiler_instance = Compiler::new();
                     compiler_instance.compile(inner, path);
-                    let success: [bool; 3] = [
-                        compiler_instance.are_symbols_defined(),
-                        compiler_instance.is_error_free(),
-                        compiler_instance.all_acts_defined(),
-                    ];
-                    if success.iter().all(|v| *v) {
-                        println!("{:#?}", compiler_instance);
-                    }
+                    compiler_instance.run_checks();
+                    compiler_instance.generate_data_files();
                 }
                 _ => return Err(Box::new(ParseError::NoProgram(path))),
             }
