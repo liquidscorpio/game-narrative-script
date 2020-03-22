@@ -6,7 +6,7 @@ use std::borrow::BorrowMut;
 use crate::compiler::{Compiler};
 use std::error::Error;
 use crate::compiler::error::ParseError;
-use crate::compiler::walker::NarrativeWalker;
+use crate::script_parser::{ScriptParser, Rule};
 
 #[macro_use]
 extern crate log;
@@ -17,12 +17,8 @@ extern crate pest_derive;
 
 extern crate serde_json;
 
-mod compiler;
-
-#[derive(Parser)]
-#[grammar = "grammar.pest"]
-pub struct ScriptParser;
-
+pub mod compiler;
+pub mod script_parser;
 
 pub fn read_source(path: &Path) -> Result<String, ParseError> {
     match File::open(path) {
@@ -66,10 +62,5 @@ pub fn main() -> Result<(), Box<dyn Error>> {
         None => ()
     }
 
-    let walker_path = Path::new(
-        "/home/tintin/Studio/game-narrative-script/source.gcstree"
-    );
-    let mut walker = NarrativeWalker::new(walker_path)?;
-    println!("{:?}", walker.traverse("NotSoWell")?);
     Ok(())
 }

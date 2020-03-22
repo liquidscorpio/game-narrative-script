@@ -1,16 +1,17 @@
+use gdnative::*;
 use pest::iterators::Pairs;
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::path::Path;
 
-use crate::Rule;
+use crate::script_parser::Rule;
 use crate::compiler::error::ParseError;
 use std::fs::File;
 use std::io::Write;
 use std::error::Error;
 use serde::{Deserialize, Serialize};
 
-pub(crate) mod error;
-pub(crate) mod walker;
+pub mod error;
+pub mod walker;
 
 #[derive(Debug)]
 enum SymbolType {
@@ -19,7 +20,7 @@ enum SymbolType {
 }
 
 impl SymbolType {
-    pub(crate) fn from_str(token: &str) -> Result<SymbolType, ParseError> {
+    pub fn from_str(token: &str) -> Result<SymbolType, ParseError> {
         match token {
             ":character" => Ok(SymbolType::Character),
             ":act" => Ok(SymbolType::Act),
@@ -45,7 +46,7 @@ struct SymbolInfo<'a> {
 }
 
 impl<'a> SymbolInfo<'a> {
-    pub(crate) fn new(
+    pub fn new(
         path: &'a Path, sym_type: SymbolType, start_position: usize,
         attrs: Option<SymbolAttributes>,
     ) -> Self {
@@ -58,21 +59,21 @@ impl<'a> SymbolInfo<'a> {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub(crate) enum NarrativeItem {
+#[derive(ToVariant, FromVariant, Debug, Serialize, Deserialize)]
+pub enum NarrativeItem {
     Dialogue { character: String, dialogue: String },
     ChoiceSet { character: String, choices: Vec<NarrativeChoice> },
 }
 
-#[derive(Debug, Serialize, Deserialize)]
-pub(crate) struct NarrativeChoice {
+#[derive(ToVariant, FromVariant, Debug, Serialize, Deserialize)]
+pub struct NarrativeChoice {
     text: String,
     jump: String,
 }
 
 
 #[derive(Debug)]
-pub(crate) struct Compiler<'a> {
+pub struct Compiler<'a> {
     symbols: BTreeMap<String, SymbolInfo<'a>>,
     errors: Vec<ParseError<'a>>,
     unknown_symbols: HashSet<String>,
@@ -81,7 +82,7 @@ pub(crate) struct Compiler<'a> {
 }
 
 impl<'a> Compiler<'a> {
-    pub(crate) fn new() -> Self {
+    pub fn new() -> Self {
         Compiler {
             symbols: BTreeMap::new(),
             errors: vec![],
@@ -139,7 +140,7 @@ impl<'a> Compiler<'a> {
     }
 
     /// This one generates symbol table for the file at the given path.
-    pub(crate) fn compile(
+    pub fn compile(
         &mut self, pairs: Pairs<'a, Rule>, path: &'a Path,
     ) {
         for pair in pairs {
@@ -253,7 +254,7 @@ impl<'a> Compiler<'a> {
         NarrativeItem::ChoiceSet { character, choices }
     }
 
-    pub(crate) fn are_symbols_defined(&self) -> bool {
+    pub fn are_symbols_defined(&self) -> bool {
         match self.unknown_symbols.is_empty() {
             true => true,
             false => {
@@ -265,7 +266,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub(crate) fn is_error_free(&self) -> bool {
+    pub fn is_error_free(&self) -> bool {
         match self.errors.is_empty() {
             true => true,
             false => {
@@ -277,7 +278,7 @@ impl<'a> Compiler<'a> {
         }
     }
 
-    pub(crate) fn all_acts_defined(&self) -> bool {
+    pub fn all_acts_defined(&self) -> bool {
         let mut flag = true;
         self.symbols.iter().for_each(|(s, info)| {
             if let SymbolType::Act = info.symbol_type {
@@ -290,7 +291,7 @@ impl<'a> Compiler<'a> {
         flag
     }
 
-    pub(crate) fn run_checks(&mut self) -> bool {
+    pub fn run_checks(&mut self) -> bool {
         let success: [bool; 3] = [
             self.are_symbols_defined(),
             self.is_error_free(),
@@ -300,7 +301,7 @@ impl<'a> Compiler<'a> {
         self.checks_passed
     }
 
-    pub(crate) fn generate_data_files(&self) {
+    pub fn generate_data_files(&self) {
         if !self.checks_passed {
             error!("Please run 'run_checks' before generating files");
             return;

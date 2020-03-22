@@ -1,22 +1,20 @@
 :character Radius{name: "Radius"}
-:character DrBread{name: "Dr. Bread", age: "32"}
-:act Act1
-:act DoingGood
-:act NotSoWell
+:character Pumpkin{name: "Pumpkin"}
+:character Firewood{name: "Firewood"}
 
-%define Act1 {
-    @Radius "Hello, how are you?"
-    @DrBread "Thanks, I'm good! And you?"
-    @Radius [
-        "No, I'm cool" DoingGood,
-        "Not so well." NotSoWell,
-    ]
+:act c1_intro
+:act wt_pumpkin
+:act wt_firewood
+
+%define c1_intro {
+    @Radius "My brother Tangent is sick. Need to find help quick."
+    @Radius "Must go to Dr. Bread and see if he direct somehow."
 }
 
-%define DoingGood {
-    @DrBread "Oh well, then I'd rather walk away."
+%define wt_pumpkin {
+    @Pumpkin "Pumpkins are favourites of Marieland and are available in great supply. They can be combined with other items to brew powerful potions. Some of these can be poisonous too which can be fed to the residents to get rid of them."
 }
 
-%define NotSoWell {
-    @DrBread "Keep up the good work!"
+%define wt_firewood {
+    @Firewood "Firewood are rare and expensive in Marieland. The governer, keeping reckless deforestation in perspective, severely constrained wood-cutting activities. They can be traded for super-powers or used to brew exotic items."
 }

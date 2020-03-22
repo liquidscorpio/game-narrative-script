@@ -2,7 +2,7 @@ use std::path::Path;
 use std::fmt::{Formatter, Display};
 use std::fmt;
 use std::error::Error;
-use crate::{Rule};
+use crate::script_parser::{Rule};
 
 #[derive(Debug)]
 pub enum ParseError<'a> {

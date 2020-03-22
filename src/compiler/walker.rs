@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::PathBuf;
 use std::fs::File;
 use crate::compiler::{OwnedFileIndex, NarrativeItem};
 use std::error::Error;
@@ -6,14 +6,17 @@ use std::io::{Read, Seek, SeekFrom};
 use std::str;
 use crate::compiler::error::{WalkerError};
 
-pub(crate) struct NarrativeWalker<'a> {
-    _source_path: &'a Path,
+#[repr(C)]
+#[no_mangle]
+#[derive(Debug)]
+pub struct NarrativeWalker {
+    _source_path: PathBuf,
     source_handle: File,
     index: OwnedFileIndex,
 }
 
-impl<'a> NarrativeWalker<'a> {
-    pub fn new(path: &'a Path) -> Result<Self, Box<dyn Error>> {
+impl NarrativeWalker {
+    pub fn new(path: PathBuf) -> Result<Self, Box<dyn Error>> {
         let source_fp = File::open(&path)?;
         let mut index_path = path.to_path_buf();
         index_path.set_extension("gcsindex");
