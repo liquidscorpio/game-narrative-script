@@ -29,9 +29,23 @@ impl SymbolType {
     }
 }
 
-type SymbolAttributes = HashMap<String, String>;
 type FileIndex<'a> = HashMap<&'a str, (usize, usize)>;
 type OwnedFileIndex = HashMap<String, (usize, usize)>;
+
+#[derive(ToVariant, FromVariant, Debug, Serialize, Deserialize, Clone)]
+pub struct SymbolAttributes {
+    key: String,
+    value: String,
+}
+
+impl SymbolAttributes {
+    pub fn new(key: String, value: String) -> Self {
+        Self {
+            key,
+            value,
+        }
+    }
+}
 
 #[derive(Debug)]
 struct SymbolInfo<'a> {
@@ -42,13 +56,13 @@ struct SymbolInfo<'a> {
     /// Type information
     symbol_type: SymbolType,
     /// Optional extra data associated with the symbol
-    attributes: Option<SymbolAttributes>,
+    attributes: Vec<SymbolAttributes>,
 }
 
 impl<'a> SymbolInfo<'a> {
     pub fn new(
         path: &'a Path, sym_type: SymbolType, start_position: usize,
-        attrs: Option<SymbolAttributes>,
+        attrs: Vec<SymbolAttributes>,
     ) -> Self {
         SymbolInfo {
             source: path,
@@ -61,8 +75,18 @@ impl<'a> SymbolInfo<'a> {
 
 #[derive(ToVariant, FromVariant, Debug, Serialize, Deserialize)]
 pub enum NarrativeItem {
-    Dialogue { character: String, dialogue: String },
-    ChoiceSet { character: String, choices: Vec<NarrativeChoice> },
+    Dialogue {
+        character: String,
+        display_name: String,
+        dialogue: String,
+        attributes: Vec<SymbolAttributes>,
+    },
+    ChoiceSet {
+        character: String,
+        display_name: String,
+        choices: Vec<NarrativeChoice>,
+        attributes: Vec<SymbolAttributes>,
+    },
 }
 
 #[derive(ToVariant, FromVariant, Debug, Serialize, Deserialize)]
@@ -165,26 +189,29 @@ impl<'a> Compiler<'a> {
 
         let symbol = inner.next().unwrap().as_str().to_string();
         let attrs = match inner.next() {
-            Some(a) => Some(self.object_attrs(a.into_inner())),
-            None => None
+            Some(a) => self.object_attrs(a.into_inner()),
+            None => vec![],
         };
 
         let info = SymbolInfo::new(
-            path, sym_type, atom.as_span().start(), attrs);
+            path, sym_type, atom.as_span().start(), attrs
+        );
+
         match self.has_symbol(&symbol) {
             true => self.record_dec_conflict(symbol, path),
             false => self.record_symbol(symbol, info),
         };
     }
 
-    fn object_attrs(&mut self, mut pairs: Pairs<Rule>) -> SymbolAttributes {
-        let mut attributes: HashMap<String, String> = HashMap::new();
+    fn object_attrs(&mut self, mut pairs: Pairs<Rule>) -> Vec<SymbolAttributes> {
+        let mut attributes = vec![];
         let attr_pairs = pairs.next().unwrap().into_inner();
         for kv_pair in attr_pairs {
             let mut key_value = kv_pair.into_inner();
             let key = key_value.next().unwrap().as_str().to_string();
-            let val = key_value.next().unwrap().as_str().to_string();
-            attributes.insert(key, val);
+            let val = key_value.next().unwrap().into_inner().next()
+                .unwrap().as_str().to_string();
+            attributes.push(SymbolAttributes::new(key, val));
         }
 
         attributes
@@ -226,8 +253,11 @@ impl<'a> Compiler<'a> {
         if !self.has_symbol(&character) {
             self.unknown_symbols.insert(character.clone());
         }
-        let dialogue = pairs.next().unwrap().as_str().to_string();
-        NarrativeItem::Dialogue { character, dialogue }
+        let dialogue = pairs.next().unwrap().into_inner().next().unwrap().as_str().to_string();
+        // We do not always have attributes when parsing acts as characters
+        // may be defined else where. Therefore, population of attributes is
+        // done when generating tree files.
+        NarrativeItem::Dialogue { character, display_name: "".to_string(), dialogue, attributes: vec![] }
     }
 
     fn choice_expr(&mut self, mut pairs: Pairs<Rule>) -> NarrativeItem {
@@ -238,7 +268,8 @@ impl<'a> Compiler<'a> {
 
         let choices: Vec<NarrativeChoice> = pairs.map(|pair| {
             let mut tokens = pair.into_inner();
-            let text = tokens.next().unwrap().as_str().to_string();
+            let text = tokens.next().unwrap().into_inner().next()
+                .unwrap().as_str().to_string();
             let jump = tokens.next().unwrap().as_str();
 
             if !self.has_symbol(jump) {
@@ -251,7 +282,7 @@ impl<'a> Compiler<'a> {
             }
         }).collect();
 
-        NarrativeItem::ChoiceSet { character, choices }
+        NarrativeItem::ChoiceSet { character, display_name: "".to_string(), choices, attributes: vec![] }
     }
 
     pub fn are_symbols_defined(&self) -> bool {
@@ -301,11 +332,48 @@ impl<'a> Compiler<'a> {
         self.checks_passed
     }
 
-    pub fn generate_data_files(&self) {
+    // *** WARNING! HACKY STUFF AHEAD ***
+    // TODO: Come up with better design for this hacky approach
+    fn update_narrative_items(&mut self) {
+
+        #[inline]
+        fn patch(
+            character: &mut String, display_name: &mut String,
+            attributes: &mut Vec<SymbolAttributes>, symbols: &BTreeMap<String, SymbolInfo>
+        ) {
+            let sym_info = symbols.get(character).unwrap();
+            for obj in &sym_info.attributes {
+                if obj.key == "name" {
+                    *display_name = obj.value.clone();
+                }
+            }
+            *attributes = sym_info.attributes.to_vec();
+        }
+
+        for (_, narrative) in &mut self.definition {
+            for ntv in narrative {
+                match ntv {
+                    NarrativeItem::Dialogue { character, display_name, dialogue: _, attributes } => {
+                        patch(character, display_name, attributes, &self.symbols);
+                    }
+                    NarrativeItem::ChoiceSet { character, display_name, choices: _, attributes } => {
+                        patch(character, display_name, attributes, &self.symbols);
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn generate_data_files(&mut self) {
         if !self.checks_passed {
             error!("Please run 'run_checks' before generating files");
             return;
         }
+
+        // We update narrative-items with metadata after ensuring all
+        // characters and acts are defined.
+        self.update_narrative_items();
+
         match self.generate_tree_file() {
             Ok(index) => {
                 match self.generate_index_file(&index) {

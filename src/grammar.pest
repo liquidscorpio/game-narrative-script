@@ -16,7 +16,7 @@ choice_record    = { string ~ identifier }
 
 
 multi_line_string  = @{ "\"\"\"" ~ inner ~ "\"\"\"" }
-string             = @{ double_quote ~ inner ~ double_quote }
+string             = { double_quote ~ inner ~ double_quote }
 inner              = @{ (!("\"" | "\\" | "\u{0000}" | "\u{001F}") ~ ANY)* ~ (escape ~ inner)? }
 identifier         = @{ (ASCII_ALPHANUMERIC | "_" | "-")+ }
 character_ref      = @{"@" ~ identifier }

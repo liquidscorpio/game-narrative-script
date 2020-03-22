@@ -1,14 +1,29 @@
 :character Radius{name: "Radius"}
+:character DrBread{name: "Dr. Bread"}
 :character Pumpkin{name: "Pumpkin"}
 :character Firewood{name: "Firewood"}
 
 :act c1_intro
 :act wt_pumpkin
 :act wt_firewood
+:act c1_please_help
+:act c1_obx_weed
 
 %define c1_intro {
-    @Radius "My brother Tangent is sick. Need to find help quick."
-    @Radius "Must go to Dr. Bread and see if he direct somehow."
+    @Radius "My brother Tangent is hurt. Dr. Bread, please help."
+    @DrBread "Hmm... The wound is grave and deep. I fear there is not much we can do here."
+    @Radius [
+        "Please, Dr.! There could something that can be done." c1_please_help,
+        "Oh! Good riddance. He is an obnoxious weed." c1_obx_weed,
+    ]
+}
+
+%define c1_please_help {
+    @DrBread "Not sure. Let me think."
+}
+
+%define c1_obx_weed {
+    @DrBread "Oh, my! You must be a troubled soul. Aren't you?"
 }
 
 %define wt_pumpkin {
