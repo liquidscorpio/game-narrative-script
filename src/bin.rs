@@ -42,7 +42,8 @@ pub fn read_source(path: &Path) -> Result<String, ParseError> {
 
 pub fn main() -> Result<(), Box<dyn Error>> {
     env_logger::init();
-    let path = Path::new("/home/tintin/Studio/game-narrative-script/src/source.gcs");
+    let args: Vec<String> = env::args().collect();
+    let path = Path::new(&args[1]);
     let program = read_source(path)?;
     let mut parse_result = ScriptParser::parse(Rule::program, &program)?;
     match parse_result.next() {
