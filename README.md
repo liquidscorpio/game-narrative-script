@@ -1,6 +1,6 @@
 # game-narrative-script
 
-A toolkit to declaratively specific non-linear narration for games and easily integrate with Godot.
+A toolkit to declaratively specify non-linear narration for games and easily integrate with Godot.
 
 ### Example
 1. Clone the repository
